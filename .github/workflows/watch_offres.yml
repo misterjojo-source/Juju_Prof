@@ -1,0 +1,43 @@
+name: Surveiller les offres Education Nationale
+
+on:
+  schedule:
+    # Tous les jours à 20h00 heure de Paris (18h UTC en été)
+    - cron: "0 18 * * *"
+
+  # Permet de lancer manuellement depuis l'onglet Actions
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    # Permissions nécessaires pour committer offres_seen.json
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Lancer la vérification
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python watch_offres.py
+
+      - name: Committer l'état mis à jour
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add offres_seen.json
+          # Ne commit que si le fichier a changé
+          git diff --cached --quiet || git commit -m "chore: mise à jour offres_seen.json [skip ci]"
+          git push
